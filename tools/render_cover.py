@@ -77,14 +77,17 @@ def add_confetti(base: Image.Image, density: float = 0.0015, seed: int = 1234) -
 
 def add_vignette(img: Image.Image, strength: float = 0.35) -> None:
     w, h = img.size
+    # Erzeuge Alphamaske (L) radial -> stärker an den Rändern
     vignette = Image.new("L", (w, h), 0)
     xv, yv = np.meshgrid(np.linspace(-1, 1, w), np.linspace(-1, 1, h))
     r = np.sqrt(xv**2 + yv**2)
     mask = np.clip((r - 0.5) / (1.0 - 0.5), 0, 1)
     mask = (mask * 255 * strength).astype(np.uint8)
     vignette.putdata(mask.reshape(-1))
-    dark = Image.new("RGBA", (w, h), (0, 0, 0, 255))
-    img.alpha_composite(dark, (0, 0), vignette)
+    # Schwarzes Overlay, Maske als Alpha setzen und dann zusammensetzen
+    overlay = Image.new("RGBA", (w, h), (0, 0, 0, 255))
+    overlay.putalpha(vignette)
+    img.alpha_composite(overlay)
 
 
 def add_text_with_stroke(
@@ -162,9 +165,8 @@ def compose_variant(
     dom_img = load_image(dom_path)
     if dom_img is not None:
         dom_img = ensure_square_canvas(dom_img, size)
-        # leichter Klarheits-Boost
-        dom_blur = dom_img.filter(ImageFilter.GaussianBlur(radius=1.0))
-        sharpen = Image.blend(dom_img, dom_blur, alpha= -0.25)
+        # leichter Klarheits-/Schärfe-Boost
+        sharpen = dom_img.filter(ImageFilter.UnsharpMask(radius=1.2, percent=80, threshold=3))
         canvas.alpha_composite(sharpen)
     else:
         # Fallback Verlauf
